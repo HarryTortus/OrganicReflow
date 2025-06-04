@@ -1,7 +1,7 @@
 // Global variables for P5.js sketch
 let curves = []; // Array to hold all active curves
 let freezeGrowth = false; // Controls if curves grow
-let versionNumber = "1.0"; // Version of the app
+let versionNumber = "1.1 - Tangent Repulsion"; // Version of the app
 
 // Settings object to control the behavior of the curves and repulsion
 const settings = {
@@ -46,7 +46,7 @@ class Segment {
     constructor(x, y, angle) {
         this.x = x;
         this.y = y;
-        this.angle = angle; // Direction of the segment
+        this.angle = angle; // Direction of the segment (tangent)
     }
 }
 
@@ -63,7 +63,7 @@ class Curve {
 
     /**
      * Attempts to grow the curve by adding a new segment.
-     * Incorporates repulsion from other curves and canvas boundaries.
+     * Incorporates tangent-based repulsion from other curves and canvas boundaries.
      * @param {Array<Curve>} allCurves - All active curves on the canvas for repulsion calculation.
      */
     grow(allCurves) {
@@ -78,27 +78,43 @@ class Curve {
         // Add some randomness to the direction
         currentAngle += map(random(), 0, 1, -settings.randomness, settings.randomness);
 
-        // Calculate repulsion force from other curves
-        let repulsionVectorX = 0;
-        let repulsionVectorY = 0;
+        // Initialize total repulsion vector
+        let totalRepulsionVector = createVector(0, 0);
 
+        // Calculate tangent-based repulsion force from other curves
         for (let otherCurve of allCurves) {
             if (otherCurve === this) continue; // Don't repel from self
 
             for (let otherSegment of otherCurve.segments) {
-                const distSq = this.distSq(lastSegment.x, lastSegment.y, otherSegment.x, otherSegment.y);
+                const distSq = distSq(lastSegment.x, lastSegment.y, otherSegment.x, otherSegment.y);
 
                 if (distSq < settings.repulsionRadius * settings.repulsionRadius) {
                     const d = sqrt(distSq);
-                    // Calculate a vector pointing from the other segment to the current tip
-                    const dx = lastSegment.x - otherSegment.x;
-                    const dy = lastSegment.y - otherSegment.y;
+                    if (d === 0) continue; // Avoid division by zero if points are identical
 
-                    // Normalize and apply inverse distance squared force
-                    // Stronger repulsion when closer
-                    const forceMagnitude = settings.repulsionStrength * (1 - d / settings.repulsionRadius);
-                    repulsionVectorX += (dx / d) * forceMagnitude;
-                    repulsionVectorY += (dy / d) * forceMagnitude;
+                    // Vector from the other segment to the current growing tip
+                    const vecToTip = createVector(lastSegment.x - otherSegment.x, lastSegment.y - otherSegment.y);
+
+                    // Tangent vector of the other segment
+                    const otherTangent = p5.Vector.fromAngle(otherSegment.angle);
+
+                    // Normal vector to the other segment's tangent (pointing "outward" from the curve)
+                    // We can pick one direction for the normal, e.g., +90 degrees (HALF_PI)
+                    const otherNormal = p5.Vector.fromAngle(otherSegment.angle + HALF_PI);
+
+                    // Project vecToTip onto the otherNormal to find the repulsion component
+                    // This determines how much the tip is on the "repel" side of the other curve
+                    const repulsionComponent = vecToTip.dot(otherNormal);
+
+                    // Only repel if the tip is on the "outward" side of the other curve's normal
+                    // A small positive value ensures it's on the correct side
+                    if (repulsionComponent > 0.1) { // Adjusted threshold for more stable repulsion
+                        // Calculate force magnitude: stronger when closer, and proportional to repulsionComponent
+                        const forceMagnitude = settings.repulsionStrength * (1 - d / settings.repulsionRadius) * repulsionComponent;
+
+                        // Add the repulsion force in the direction of the normal
+                        totalRepulsionVector.add(otherNormal.copy().setMag(forceMagnitude));
+                    }
                 }
             }
         }
@@ -109,24 +125,24 @@ class Curve {
 
         // Left boundary
         if (lastSegment.x < boundaryMargin) {
-            repulsionVectorX += boundaryRepulsionStrength * (1 - lastSegment.x / boundaryMargin);
+            totalRepulsionVector.x += boundaryRepulsionStrength * (1 - lastSegment.x / boundaryMargin);
         }
         // Right boundary
         if (lastSegment.x > width - boundaryMargin) {
-            repulsionVectorX -= boundaryRepulsionStrength * (1 - (width - lastSegment.x) / boundaryMargin);
+            totalRepulsionVector.x -= boundaryRepulsionStrength * (1 - (width - lastSegment.x) / boundaryMargin);
         }
         // Top boundary
         if (lastSegment.y < boundaryMargin) {
-            repulsionVectorY += boundaryRepulsionStrength * (1 - lastSegment.y / boundaryMargin);
+            totalRepulsionVector.y += boundaryRepulsionStrength * (1 - lastSegment.y / boundaryMargin);
         }
         // Bottom boundary
         if (lastSegment.y > height - boundaryMargin) {
-            repulsionVectorY -= boundaryRepulsionStrength * (1 - (height - lastSegment.y) / boundaryMargin);
+            totalRepulsionVector.y -= boundaryRepulsionStrength * (1 - (height - lastSegment.y) / boundaryMargin);
         }
 
-        // Apply repulsion force to the angle
-        if (abs(repulsionVectorX) > 0.001 || abs(repulsionVectorY) > 0.001) {
-            currentAngle = atan2(sin(currentAngle) + repulsionVectorY, cos(currentAngle) + repulsionVectorX);
+        // Apply total repulsion vector to the current angle
+        if (totalRepulsionVector.magSq() > 0.0001) { // Only apply if there's a significant repulsion
+            currentAngle = atan2(sin(currentAngle) + totalRepulsionVector.y, cos(currentAngle) + totalRepulsionVector.x);
         }
 
         // Calculate new position
@@ -140,12 +156,12 @@ class Curve {
             return;
         }
 
-        // Check for self-intersection (simplified)
+        // Check for self-intersection (simplified - still point-based for simplicity)
         // This is a very basic check and can be improved for more robust collision detection
         const minSelfDistSq = (settings.segmentLength * 0.5) * (settings.segmentLength * 0.5); // Prevent immediate self-intersection
         for (let i = 0; i < this.segments.length - 2; i++) { // Check against all but the last two segments
             const oldSegment = this.segments[i];
-            const d = this.distSq(newX, newY, oldSegment.x, oldSegment.y);
+            const d = distSq(newX, newY, oldSegment.x, oldSegment.y);
             if (d < minSelfDistSq) {
                 this.active = false; // Deactivate if self-intersection detected
                 return;
@@ -153,19 +169,6 @@ class Curve {
         }
 
         this.segments.push(new Segment(newX, newY, currentAngle));
-    }
-
-    /**
-     * Helper function to calculate squared distance between two points.
-     * Using squared distance avoids sqrt for performance when only comparing distances.
-     * @param {number} x1 - X coordinate of point 1.
-     * @param {number} y1 - Y coordinate of point 1.
-     * @param {number} x2 - X coordinate of point 2.
-     * @param {number} y2 - Y coordinate of point 2.
-     * @returns {number} The squared distance.
-     */
-    distSq(x1, y1, x2, y2) {
-        return (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
     }
 
     /**
@@ -241,15 +244,14 @@ function draw() {
                     if (!curve.active) break; // Stop growing if deactivated during this frame
                 }
             } else {
-                // If a curve becomes inactive, remove it (optional, can keep for fading effects)
-                // For now, let's keep them to see the full pattern, but they won't grow further.
+                // If a curve becomes inactive, for now, we keep it to see the full pattern.
                 // If you want to remove them, uncomment the line below:
                 // curves.splice(i, 1);
             }
         }
 
         // Add new curves if needed (e.g., if too few active curves)
-        // This simple logic ensures we always have at least one active curve
+        // This simple logic ensures we always have at least one active curve, up to numInitialCurves
         if (curves.filter(c => c.active).length < settings.numInitialCurves) {
             addNewCurve();
         }
@@ -372,7 +374,7 @@ function setupControls() {
 
     // Initialize control values from settings and update slider fills
     Object.keys(settings).forEach(key => {
-        const input = document.getElementById(key);
+        const input = getEl(key);
         if (input) {
             try {
                 if (input.type === 'checkbox') {
@@ -431,7 +433,7 @@ function setupControls() {
         input.addEventListener('input', (e) => {
             let value = parseFloat(e.target.value);
             // Handle specific settings that might need different parsing or display
-            if (e.target.id === 'repulsionStrength' || e.target.id === 'randomness') {
+            if (e.target.id === 'repulsionStrength' || e.target.id === 'randomness' || e.target.id === 'lineThickness') {
                 settings[e.target.id] = value;
             } else {
                 settings[e.target.id] = parseInt(value);
