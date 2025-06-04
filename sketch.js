@@ -1,7 +1,7 @@
 // Global variables for P5.js sketch
 let curves = []; // Array to hold all active curves
 let freezeGrowth = false; // Controls if curves grow
-let versionNumber = "1.1 - Tangent Repulsion"; // Version of the app
+let versionNumber = "1.2 - Tangent Repulsion (Fixed)"; // Version of the app
 
 // Settings object to control the behavior of the curves and repulsion
 const settings = {
@@ -18,7 +18,7 @@ const settings = {
     freeze: false, // Freeze growth (similar to your previous app's freeze)
     dynamicColor: true, // Use dynamic HSB color based on curve properties
     hueShift: 180, // Base hue for dynamic coloring
-    hueRangeWidth: 270 // Range of hues for dynamic coloring
+    hueRangeWidth: 270 // Range of hues for dynamic coloring (not directly tied to a UI element ID)
 };
 
 // --- Helper Functions ---
@@ -86,10 +86,13 @@ class Curve {
             if (otherCurve === this) continue; // Don't repel from self
 
             for (let otherSegment of otherCurve.segments) {
-                const distSq = distSq(lastSegment.x, lastSegment.y, otherSegment.x, otherSegment.y);
+                // --- FIX START ---
+                // Use p5.js dist() function to calculate distance
+                const d = dist(lastSegment.x, lastSegment.y, otherSegment.x, otherSegment.y);
+                const currentDistSq = d * d; // Calculate squared distance for comparison
+                // --- FIX END ---
 
-                if (distSq < settings.repulsionRadius * settings.repulsionRadius) {
-                    const d = sqrt(distSq);
+                if (currentDistSq < settings.repulsionRadius * settings.repulsionRadius) {
                     if (d === 0) continue; // Avoid division by zero if points are identical
 
                     // Vector from the other segment to the current growing tip
@@ -161,8 +164,8 @@ class Curve {
         const minSelfDistSq = (settings.segmentLength * 0.5) * (settings.segmentLength * 0.5); // Prevent immediate self-intersection
         for (let i = 0; i < this.segments.length - 2; i++) { // Check against all but the last two segments
             const oldSegment = this.segments[i];
-            const d = distSq(newX, newY, oldSegment.x, oldSegment.y);
-            if (d < minSelfDistSq) {
+            const d = dist(newX, newY, oldSegment.x, oldSegment.y); // Use dist() here too
+            if (d * d < minSelfDistSq) { // Compare squared distances
                 this.active = false; // Deactivate if self-intersection detected
                 return;
             }
@@ -351,6 +354,7 @@ function setupControls() {
     };
 
     // Critical control IDs (ensure these exist for basic functionality)
+    // Note: 'hueRangeWidth' was removed from this list as it's a setting property, not an HTML element ID.
     const criticalControlIds = [
         'numInitialCurves', 'segmentLength', 'repulsionRadius', 'repulsionStrength',
         'randomness', 'growthRate', 'maxSegmentsPerCurve', 'lineThickness',
@@ -375,7 +379,8 @@ function setupControls() {
     // Initialize control values from settings and update slider fills
     Object.keys(settings).forEach(key => {
         const input = getEl(key);
-        if (input) {
+        // Only attempt to set value for actual input elements, not just settings properties
+        if (input && typeof settings[key] !== 'object') { // Exclude objects like hueRangeWidth if it were an object
             try {
                 if (input.type === 'checkbox') {
                     input.checked = settings[key];
