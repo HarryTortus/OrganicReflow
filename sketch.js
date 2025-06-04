@@ -86,7 +86,7 @@ class Curve {
             if (otherCurve === this) continue; // Don't repel from self
 
             for (let otherSegment of otherCurve.segments) {
-                const distSq = distSq(lastSegment.x, lastSegment.y, otherSegment.x, otherSegment.y);
+                const distSq = this.distSq(lastSegment.x, lastSegment.y, otherSegment.x, otherSegment.y);
 
                 if (distSq < settings.repulsionRadius * settings.repulsionRadius) {
                     const d = sqrt(distSq);
@@ -145,7 +145,7 @@ class Curve {
         const minSelfDistSq = (settings.segmentLength * 0.5) * (settings.segmentLength * 0.5); // Prevent immediate self-intersection
         for (let i = 0; i < this.segments.length - 2; i++) { // Check against all but the last two segments
             const oldSegment = this.segments[i];
-            const d = distSq(newX, newY, oldSegment.x, oldSegment.y);
+            const d = this.distSq(newX, newY, oldSegment.x, oldSegment.y);
             if (d < minSelfDistSq) {
                 this.active = false; // Deactivate if self-intersection detected
                 return;
@@ -153,6 +153,19 @@ class Curve {
         }
 
         this.segments.push(new Segment(newX, newY, currentAngle));
+    }
+
+    /**
+     * Helper function to calculate squared distance between two points.
+     * Using squared distance avoids sqrt for performance when only comparing distances.
+     * @param {number} x1 - X coordinate of point 1.
+     * @param {number} y1 - Y coordinate of point 1.
+     * @param {number} x2 - X coordinate of point 2.
+     * @param {number} y2 - Y coordinate of point 2.
+     * @returns {number} The squared distance.
+     */
+    distSq(x1, y1, x2, y2) {
+        return (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
     }
 
     /**
@@ -485,4 +498,15 @@ function resetSketch() {
         addNewCurve();
     }
     background(settings.backgroundColor); // Clear the canvas
-    console.log("Organic Reflow: Sketch reset. New curves ini
+    console.log("Organic Reflow: Sketch reset. New curves initialized.");
+}
+
+/**
+ * Adds a new curve to the canvas at a random starting position and direction.
+ */
+function addNewCurve() {
+    const startX = random(width);
+    const startY = random(height);
+    const startAngle = random(TWO_PI);
+    curves.push(new Curve(startX, startY, startAngle));
+}
