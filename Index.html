@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organic Reflow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Your existing CSS for the UI */
+        body {
+            margin: 0;
+            overflow-x: hidden; 
+            background-color: #ede3df;
+            display: flex;
+            flex-direction: column; 
+            align-items: center; 
+            min-height: 10vh; 
+            padding-top: 20px; 
+            padding-bottom: 10px; 
+            box-sizing: border-box;
+        }
+
+        .main-title {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 700;
+            font-size: 2.8em;
+            color: #3b4c1a;
+            margin-top: 0; 
+            margin-bottom: 30px;
+            text-align: center;
+            letter-spacing: 2px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+            flex-shrink: 0; 
+        }
+
+        #sketch-container {
+            width: 100%; 
+            display: flex;
+            flex-direction: column; 
+            align-items: center; 
+            flex-grow: 1; 
+            padding-left: 20px; 
+            padding-right: 20px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            display: block; 
+            margin-bottom: 20px; 
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            max-width: 100%; 
+            height: auto; 
+            flex-shrink: 0; 
+        }
+
+        body.fullscreen-active { padding: 0 !important; overflow: hidden !important; }
+        body.fullscreen-active .main-title,
+        body.fullscreen-active .controls,
+        body.fullscreen-active #site-footer { display: none !important; }
+        body.fullscreen-active #sketch-container { width: 100vw !important; height: 100vh !important; max-width: none !important; padding: 0 !important; }
+        body.fullscreen-active canvas { margin-bottom: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+
+        .controls {
+            display: flex; flex-direction: column; gap: 18px;
+            background: rgba(76, 97, 33, 0.9); border-radius: 12px;
+            padding: 20px 24px; align-items: center; justify-content: center;
+            color: #ede3df; font-family: 'Oswald', sans-serif; font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.10); width: 100%; 
+            box-sizing: border-box; flex-shrink: 0; 
+            overflow-x: auto; margin-bottom: 10px;
+        }
+        .controls .control-group { display: flex; flex-wrap: wrap; gap: 18px; width: 100%; justify-content: center;}
+        .controls .control-group.action-group { padding-top: 18px; }
+        .controls::-webkit-scrollbar { height: 10px; background: #ede3df; border-radius: 6px; }
+        .controls::-webkit-scrollbar-thumb { background: #3b4c1a; border-radius: 6px; }
+        .controls::-webkit-scrollbar-thumb:hover { background: #4c6121; }
+
+        .controls label {
+            margin-right: 6px;
+            font-weight: normal; 
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        .controls input[type="range"] { width: 120px;-webkit-appearance: none;appearance: none;background: transparent;margin: 0 8px; }
+        .controls input[type="range"]::-webkit-slider-runnable-track { width: 100%;height: 8px;background: linear-gradient(to right, #3b4c1a var(--range-progress, 0%), #ede3df var(--range-progress, 0%));border-radius: 4px;cursor: pointer; }
+        .controls input[type="range"]::-moz-range-track { width: 100%;height: 8px;background: linear-gradient(to right, #3b4c1a var(--range-progress, 0%), #ede3df var(--range-progress, 0%));border-radius: 4px;cursor: pointer; }
+        .controls input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none;appearance: none;border: none;width: 18px;height: 18px;border-radius: 50%;background: #3b4c1a;cursor: pointer;margin-top: -5px;box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .controls input[type="range"]::-moz-range-thumb { border: none;width: 18px;height: 18px;border-radius: 50%;background: #3b4c1a;cursor: pointer;box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .controls input[type="range"]::-webkit-slider-thumb:hover { background: #4c6121; }
+        .controls input[type="range"]::-moz-range-thumb:hover { background: #4c6121; }
+        .controls input[type="color"] { border: none; background: none; width: 32px; height: 32px; border-radius: 6px; margin-left: 4px; }
+        .controls input[type="checkbox"] { transform: scale(1.2); margin-left: 6px; accent-color: #3b4c1a; }
+        .controls button { background: #3b4c1a; color: #ede3df; border: none; border-radius: 6px; padding: 6px 16px; font-size: 14px; cursor: pointer; font-weight: bold; margin-left: 8px; }
+        .controls button:hover { background: #4c6121; }
+        .value-display { display: inline-block; min-width: 30px; text-align: right; margin-left: 2px; font-weight: normal; }
+        .color-swatch { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5); margin-left: 8px; box-sizing: border-box; flex-shrink: 0; }
+
+        #site-footer {
+            width: 100%; padding: 5px 0; font-family: 'Oswald', sans-serif; font-size: 0.9em;
+            color: #3b4c1a; margin-top: auto; flex-shrink: 0; box-sizing: border-box;
+            display: flex; justify-content: center; align-items: center; gap: 8px; 
+        }
+        #site-footer a { color: #3b4c1a; text-decoration: none; }
+        #site-footer a:hover { text-decoration: underline; }
+        #site-footer span { color: #3b4c1a; }
+
+        @media (max-width: 600px) { 
+            .main-title { font-size: 2em; margin-bottom: 20px; letter-spacing: 1.5px; }
+            .controls { padding: 15px; gap: 15px; }
+            .controls label { font-size: 13px; }
+            .controls input[type="range"] { width: 100px; }
+        }
+        @media (max-width: 420px) {
+            .main-title { font-size: 1.7em; margin-bottom: 15px; letter-spacing: 1px;}
+            #sketch-container { padding-left: 10px; padding-right: 10px;}
+            .controls .control-group { flex-direction: column; align-items: stretch; }
+            .controls label { justify-content: space-between; }
+            .controls input[type="range"] { width: auto; flex-grow: 1; margin-left: 10px; }
+            .controls button { width: 100%; margin-left: 0; margin-top: 10px; }
+        }
+    </style>
+    <!-- P5.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <!-- Your custom sketch file -->
+    <script src="sketch.js"></script>
+</head>
+<body>
+    <h1 class="main-title" id="mainTitle">ORGANIC REFLOW</h1>
+    <div id="sketch-container">
+        <div id="p5-canvas-placeholder"></div>
+        <div class="controls" id="controlsPanel">
+            <div class="control-group slider-group">
+                <label>Initial Curves <input id="numInitialCurves" type="range" min="1" max="10" step="1" value="3"> <span id="numInitialCurves-value" class="value-display"></span></label>
+                <label>Segment Length <input id="segmentLength" type="range" min="5" max="50" step="1" value="20"> <span id="segmentLength-value" class="value-display"></span></label>
+                <label>Repulsion Radius <input id="repulsionRadius" type="range" min="10" max="150" step="5" value="70"> <span id="repulsionRadius-value" class="value-display"></span></label>
+                <label>Repulsion Strength <input id="repulsionStrength" type="range" min="0.01" max="0.5" step="0.01" value="0.1"> <span id="repulsionStrength-value" class="value-display"></span></label>
+                <label>Randomness <input id="randomness" type="range" min="0" max="1" step="0.01" value="0.5"> <span id="randomness-value" class="value-display"></span></label>
+                <label>Growth Rate <input id="growthRate" type="range" min="1" max="10" step="1" value="3"> <span id="growthRate-value" class="value-display"></span></label>
+                <label>Max Segments <input id="maxSegmentsPerCurve" type="range" min="50" max="1000" step="50" value="300"> <span id="maxSegmentsPerCurve-value" class="value-display"></span></label>
+                <label>Line Thickness <input id="lineThickness" type="range" min="0.5" max="5" step="0.5" value="1"> <span id="lineThickness-value" class="value-display"></span></label>
+            </div>
+            <div class="control-group action-group">
+                <label>Freeze <input id="freeze" type="checkbox"></label>
+                <label>Dynamic Color <input id="dynamicColor" type="checkbox" checked></label>
+                <label id="fixedLineColorControl" style="display: none;">Line Color <input id="lineColor" type="color" value="#4c6121"></label>
+                <label id="dynamicColorHueShiftControl">Color Palette Shift <input id="hueShift" type="range" min="0" max="360" step="1" value="180"><div id="hueShiftColorSwatch" class="color-swatch"></div></label>
+                <label>Background <input id="backgroundColor" type="color" value="#ede3df"></label>
+                <button id="reset">Reset</button>
+                <button id="fullscreenButton">Fullscreen</button>
+            </div>
+        </div>
+    </div>
+    <footer id="site-footer">
+        <a href="https://www.mickeywilliamson3d.com/" target="_blank">MickeyWilliamson3D.com</a>
+        <span>|</span>
+        <a href="https://harrytortus.github.io/" target="_blank">HarryTortus.GitHub.io</a>
+        <span>|</span>
+        <span id="versionDisplay"></span>
+    </footer>
+</body>
+</html>
+
